@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="Lower A"/>
 <meta name="theme-color" content="#0b0d10"/>
-<title>Lower A — Flexible Logger</title>
+<title>Lower A — Tonight log</title>
 <style>
 :root{--bg:#0b0d10;--card:#161a22;--card2:#1e2430;--text:#f3f5f8;--muted:#9aa3b2;--accent:#5eead4;--good:#4ade80;--line:#2a3140;--input:#0f131a;--danger:#f87171}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -54,19 +54,19 @@ button.remove{color:var(--danger);border-color:rgba(248,113,113,.35);padding:8px
 </head>
 <body>
 <header>
-  <h1>Lower A — Flexible Logger</h1>
-  <div class="sub">Rename · add what you did · auto-saves · Export to Health Bot</div>
+  <h1>Lower A — Tonight log</h1>
+  <div class="sub">Your real lifts · fill the 3 blanks · Export to Health Bot</div>
   <div class="progress"><i id="prog"></i></div>
 </header>
 <main id="app">
   <!-- Visible on first paint before JS runs -->
   <ul class="static-list" id="bootList">
-    <li>Back squat or leg press <span>4 sets · 6-8</span></li>
-    <li>Romanian deadlift <span>3 sets · 8-10</span></li>
-    <li>Lunges or Bulgarian <span>3 sets · 8-10 / leg</span></li>
-    <li>Leg curl <span>3 sets · 10-12</span></li>
-    <li>Calf raise <span>3 sets · 10-15</span></li>
-    <li>Abs (hanging knee raise or cable crunch) <span>3 sets · 10-15</span></li>
+    <li>Back squat <span>60 / 70 / 70 × 8 (filled)</span></li>
+    <li>Leg press <span>fill me</span></li>
+    <li>Lying leg curl <span>32 × 12 × 3 (filled)</span></li>
+    <li>Seated leg curl <span>fill me</span></li>
+    <li>Seated calf raise <span>25 × 12 × 3 (filled)</span></li>
+    <li>Standing calf <span>fill me</span></li>
   </ul>
 </main>
 <div class="foot">
@@ -77,14 +77,14 @@ button.remove{color:var(--danger);border-color:rgba(248,113,113,.35);padding:8px
 <script>
 (function(){
 var DEFAULTS = [
-  {id:"squat_or_press",name:"Back squat or leg press",target:"4 x 6-8",sets:4,rep_lo:6,rep_hi:8,tip:"Tap name to rename (squat vs leg press). Last 2 hard but clean."},
-  {id:"rdl",name:"Romanian deadlift",target:"3 x 8-10",sets:3,rep_lo:8,rep_hi:10,tip:"Slight knee bend, hips back, bar close."},
-  {id:"lunge",name:"Lunges or Bulgarian",target:"3 x 8-10 / leg",sets:3,rep_lo:8,rep_hi:10,tip:"Rename to what you did. Log reps per leg."},
-  {id:"leg_curl",name:"Leg curl",target:"3 x 10-12",sets:3,rep_lo:10,rep_hi:12,tip:"Seated or lying."},
-  {id:"calf",name:"Calf raise",target:"3 x 10-15",sets:3,rep_lo:10,rep_hi:15,tip:"Full heel drop then rise."},
-  {id:"abs",name:"Abs (hanging knee raise or cable crunch)",target:"3 x 10-15",sets:3,rep_lo:10,rep_hi:15,tip:"Rename to the variation you used."}
+  {id:"back_squat",name:"Back squat",target:"3 x 6-8",sets:3,rep_lo:6,rep_hi:8,tip:"Already logged — edit if wrong.",preset:[{weight:"60",reps:"8",done:true},{weight:"70",reps:"8",done:true},{weight:"70",reps:"8",done:true}]},
+  {id:"leg_press",name:"Leg press",target:"fill sets",sets:3,rep_lo:6,rep_hi:12,tip:"Fill weight and reps for what you did."},
+  {id:"lying_curl",name:"Lying leg curl",target:"3 x 10-12",sets:3,rep_lo:10,rep_hi:12,tip:"Already logged — edit if wrong.",preset:[{weight:"32",reps:"12",done:true},{weight:"32",reps:"12",done:true},{weight:"32",reps:"12",done:true}]},
+  {id:"seated_curl",name:"Seated leg curl",target:"fill sets",sets:3,rep_lo:10,rep_hi:12,tip:"Fill weight and reps for what you did."},
+  {id:"seated_calf",name:"Seated calf raise",target:"3 x 10-15",sets:3,rep_lo:10,rep_hi:15,tip:"Already logged — edit if wrong.",preset:[{weight:"25",reps:"12",done:true},{weight:"25",reps:"12",done:true},{weight:"25",reps:"12",done:true}]},
+  {id:"standing_calf",name:"Standing calf",target:"fill sets",sets:3,rep_lo:10,rep_hi:15,tip:"Fill weight and reps for what you did."}
 ];
-var KEY = "lowerA_flexible_v1_2026-09-22";
+var KEY = "lowerA_tonight_v1_2026-09-22";
 
 function makeSets(n){
   var sets=[], i;
@@ -93,20 +93,28 @@ function makeSets(n){
 }
 
 function emptyState(){
-  var s={date:new Date().toISOString().slice(0,10),order:[],exercises:{}};
-  var i, d;
+  var s={date:"2026-09-22",order:[],exercises:{}};
+  var i, d, sets, j, allDone;
   for(i=0;i<DEFAULTS.length;i++){
     d=DEFAULTS[i];
     s.order.push(d.id);
+    if(d.preset&&d.preset.length){
+      sets=[];
+      for(j=0;j<d.preset.length;j++) sets.push({weight:d.preset[j].weight,reps:d.preset[j].reps,done:!!d.preset[j].done});
+    } else {
+      sets=makeSets(d.sets);
+    }
+    allDone=true;
+    for(j=0;j<sets.length;j++) if(!sets[j].done){allDone=false;break;}
     s.exercises[d.id]={
       name:d.name,
       target:d.target,
       tip:d.tip||"",
       rep_lo:d.rep_lo||8,
       rep_hi:d.rep_hi||12,
-      setCount:d.sets,
-      done:false,
-      sets:makeSets(d.sets),
+      setCount:sets.length,
+      done:allDone,
+      sets:sets,
       custom:false
     };
   }
@@ -174,7 +182,7 @@ function updateProgress(){
 }
 
 function buildExportText(){
-  var lines=["LOWER_A_EXPORT","date: "+state.date,"session: Lower A (squat bias)","---"];
+  var lines=["LOWER_A_EXPORT","date: "+state.date,"session: Lower A (actual 2026-09-22)","---"];
   var i,id,ex,j,s;
   for(i=0;i<state.order.length;i++){
     id=state.order[i];
