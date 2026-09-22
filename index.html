@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Lower A — Live Logger</title>
+<style>
+:root{--bg:#0b0d10;--card:#161a22;--card2:#1e2430;--text:#f3f5f8;--muted:#9aa3b2;--accent:#5eead4;--good:#4ade80;--line:#2a3140;--input:#0f131a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.35}
+header{position:sticky;top:0;z-index:10;background:rgba(11,13,16,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 14px}
+h1{margin:0;font-size:1.2rem}.sub{color:var(--muted);font-size:.82rem;margin-top:3px}
+.progress{margin-top:10px;height:8px;background:var(--card2);border-radius:99px;overflow:hidden}
+.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--good));transition:width .2s}
+main{padding:12px 12px 150px;max-width:680px;margin:0 auto}
+.ex{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:0 0 12px;overflow:hidden}
+.ex.done{border-color:rgba(74,222,128,.55)}
+.ex-head{display:flex;gap:10px;align-items:flex-start;padding:12px 12px 6px}
+.ex-head input{width:22px;height:22px;accent-color:var(--good);margin-top:2px}
+.ex-title h2{margin:0;font-size:1.02rem}
+.target{color:var(--accent);font-size:.85rem;font-weight:700;margin-top:2px}
+.tip{color:var(--muted);font-size:.8rem;margin-top:4px}
+.set-labels,.set-row{display:grid;grid-template-columns:32px 1fr 1fr 40px;gap:6px;align-items:center}
+.set-labels{color:var(--muted);font-size:.68rem;text-transform:uppercase;padding:0 12px;margin-top:4px}
+.set-row{background:var(--card2);border-radius:10px;padding:8px;margin:6px 12px}
+.set-row label{text-align:center;color:var(--muted);font-weight:700;font-size:.8rem}
+.set-row input[type=number]{width:100%;background:var(--input);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:11px 8px;font-size:1.05rem;text-align:center}
+.set-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--good);margin:0 auto;display:block}
+.foot{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,16,.97);border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;max-width:680px;margin:0 auto}
+button{appearance:none;border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:12px;padding:14px;font-size:1rem;font-weight:700}
+button.export{background:var(--accent);color:#042f2e;border:0;font-size:1.08rem}
+button.secondary{font-size:.88rem;font-weight:600}
+.toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);background:#022c22;color:var(--accent);border:1px solid rgba(94,234,212,.4);padding:10px 16px;border-radius:999px;font-size:.88rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Lower A — Live Logger</h1>
+  <div class="sub">Today’s squat-bias session · stay here · auto-saves on phone</div>
+  <div class="progress"><i id="prog"></i></div>
+</header>
+<main id="app"></main>
+<div class="foot">
+  <button type="button" class="export" id="btnExport">Export to Health Bot</button>
+  <button type="button" class="secondary" id="btnReset">Reset session</button>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const EXERCISES = [{"id": "squat_or_press", "name": "Back squat or leg press", "target": "4 × 6–8", "sets": 4, "rep_lo": 6, "rep_hi": 8, "tip": "Last 2 hard but clean. Back bothers you → leg press."}, {"id": "rdl", "name": "Romanian deadlift", "target": "3 × 8–10", "sets": 3, "rep_lo": 8, "rep_hi": 10, "tip": "Slight knee bend, hips back, bar close."}, {"id": "lunge", "name": "Lunges or Bulgarian split squat", "target": "3 × 8–10 / leg", "sets": 3, "rep_lo": 8, "rep_hi": 10, "tip": "Log reps per leg."}, {"id": "leg_curl", "name": "Leg curl", "target": "3 × 10–12", "sets": 3, "rep_lo": 10, "rep_hi": 12, "tip": "Seated or lying."}, {"id": "calf", "name": "Calf raise", "target": "3 × 10–15", "sets": 3, "rep_lo": 10, "rep_hi": 15, "tip": "Full heel drop then rise."}, {"id": "abs", "name": "Hanging knee raise or cable crunch", "target": "3 × 10–15", "sets": 3, "rep_lo": 10, "rep_hi": 15, "tip": "Captain’s chair or cable."}];
+const KEY = "lowerA_live_v3_2026-09-22";
+function emptyState(){
+  const s={date:new Date().toISOString().slice(0,10),exercises:{}};
+  for(const ex of EXERCISES){s.exercises[ex.id]={done:false,sets:Array.from({length:ex.sets},()=>({weight:"",reps:"",done:false}))};}
+  return s;
+}
+function load(){try{const r=localStorage.getItem(KEY);if(!r)return emptyState();const s=JSON.parse(r);
+  for(const ex of EXERCISES){if(!s.exercises[ex.id])s.exercises[ex.id]={done:false,sets:Array.from({length:ex.sets},()=>({weight:"",reps:"",done:false}))};}
+  return s;}catch(e){return emptyState();}}
+let state=load();
+function save(){localStorage.setItem(KEY,JSON.stringify(state));updateProgress();}
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2400);}
+function updateProgress(){let t=0,d=0;for(const ex of EXERCISES){const st=state.exercises[ex.id];t+=ex.sets;d+=st.sets.filter(x=>x.done).length;
+  document.getElementById("prog").style.width=(t?Math.round(d/t*100):0)+"%";}
+function buildExportText(){
+  const lines=["LOWER_A_EXPORT","date: "+state.date,"session: Lower A (squat bias)","---"];
+  for(const ex of EXERCISES){const st=state.exercises[ex.id];lines.push(ex.name+(st.done?" [DONE]":""));
+    st.sets.forEach((s,i)=>{if(s.weight||s.reps||s.done)lines.push("  S"+(i+1)+": "+(s.weight||"?")+" kg × "+(s.reps||"?")+" reps"+(s.done?" ✓":""));});}
+  lines.push("---","Watch: Traditional Strength Training","END_EXPORT");
+  return lines.join("\n");
+}
+function render(){
+  const app=document.getElementById("app");app.innerHTML="";
+  for(const ex of EXERCISES){
+    const st=state.exercises[ex.id];
+    const art=document.createElement("article");art.className="ex"+(st.done?" done":"");
+    const head=document.createElement("div");head.className="ex-head";
+    head.innerHTML=`<input type="checkbox" ${st.done?"checked":""}/><div class="ex-title"><h2>${ex.name}</h2><div class="target">${ex.target}</div><div class="tip">${ex.tip}</div></div>`;
+    head.querySelector("input").onchange=e=>{st.done=e.target.checked;if(st.done)st.sets.forEach(s=>s.done=true);save();render();};
+    art.appendChild(head);
+    const labels=document.createElement("div");labels.className="set-labels";labels.innerHTML="<span>#</span><span>Weight</span><span>Reps</span><span>✓</span>";art.appendChild(labels);
+    st.sets.forEach((row,idx)=>{
+      const div=document.createElement("div");div.className="set-row";
+      div.innerHTML=`<label>S${idx+1}</label><input type="number" inputmode="decimal" step="0.5" min="0" placeholder="kg" value="${row.weight}" data-f="weight"/><input type="number" inputmode="numeric" step="1" min="0" placeholder="${ex.rep_lo}–${ex.rep_hi}" value="${row.reps}" data-f="reps"/><input type="checkbox" ${row.done?"checked":""} data-f="done"/>`;
+      div.querySelectorAll("input").forEach(inp=>{const ev=inp.type==="checkbox"?"change":"input";
+        inp.addEventListener(ev,()=>{if(inp.dataset.f==="done")row.done=inp.checked;else row[inp.dataset.f]=inp.value;if(st.sets.every(s=>s.done))st.done=true;save();if(inp.dataset.f==="done"){art.classList.toggle("done",st.done);updateProgress();}});});
+      art.appendChild(div);
+    });
+    app.appendChild(art);
+  }
+  updateProgress();
+}
+async function exportToBot(){
+  const text=buildExportText();
+  if(navigator.share){try{await navigator.share({title:"Lower A export",text:text});toast("Shared — choose Health Bot");return;}catch(e){}}
+  try{await navigator.clipboard.writeText(text);toast("Copied — paste in Health Bot");}catch(e){prompt("Copy into Health Bot:",text);}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));a.download="LowerA_"+state.date+".txt";a.click();}catch(e){}
+}
+document.getElementById("btnExport").onclick=exportToBot;
+document.getElementById("btnReset").onclick=()=>{if(confirm("Clear this session?")){state=emptyState();save();render();toast("Reset");}};
+render();
+</script>
+</body>
+</html>
