@@ -4,9 +4,9 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-title" content="Lower A"/>
+<meta name="apple-mobile-web-app-title" content="Workout Log"/>
 <meta name="theme-color" content="#0b0d10"/>
-<title>Lower A — Tonight log</title>
+<title>Upper B — Short · Tonight</title>
 <style>
 :root{--bg:#0b0d10;--card:#161a22;--card2:#1e2430;--text:#f3f5f8;--muted:#9aa3b2;--accent:#5eead4;--good:#4ade80;--line:#2a3140;--input:#0f131a;--danger:#f87171}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -24,7 +24,7 @@ main{padding:12px 12px 190px;max-width:680px;margin:0 auto}
 .ex-title input.name{width:100%;background:var(--input);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:1.02rem;font-weight:700}
 .target{color:var(--accent);font-size:.85rem;font-weight:700;margin-top:4px}
 .tip{color:var(--muted);font-size:.8rem;margin-top:4px}
-.ex-actions{display:flex;gap:6px;padding:0 12px 8px}
+.ex-actions{display:flex;gap:6px;padding:0 12px 8px;flex-wrap:wrap}
 .ex-actions button{padding:8px 10px;font-size:.78rem;font-weight:600}
 .set-labels,.set-row{display:grid;grid-template-columns:32px 1fr 1fr 40px;gap:6px;align-items:center}
 .set-labels{color:var(--muted);font-size:.68rem;text-transform:uppercase;padding:0 12px;margin-top:4px}
@@ -44,6 +44,7 @@ button.export{background:var(--accent);color:#042f2e;border:0;font-size:1.08rem}
 button.secondary{font-size:.88rem;font-weight:600}
 button.add{background:var(--card2);border-color:var(--accent);color:var(--accent);padding:11px 14px;font-size:.9rem}
 button.remove{color:var(--danger);border-color:rgba(248,113,113,.35);padding:8px 10px}
+button.bump{padding:6px 8px;font-size:.72rem;font-weight:700;color:var(--accent);border-color:rgba(94,234,212,.35)}
 .toast{position:fixed;left:50%;bottom:160px;transform:translateX(-50%);background:#022c22;color:var(--accent);border:1px solid rgba(94,234,212,.4);padding:10px 16px;border-radius:999px;font-size:.88rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90%;text-align:center}
 .toast.show{opacity:1}
 .noscript{padding:16px;color:#f87171}
@@ -54,19 +55,20 @@ button.remove{color:var(--danger);border-color:rgba(248,113,113,.35);padding:8px
 </head>
 <body>
 <header>
-  <h1>Lower A — Tonight log</h1>
-  <div class="sub">Your real lifts · fill the 3 blanks · Export to Health Bot</div>
+  <h1 id="hdrTitle">Upper B — Short · Tonight</h1>
+  <div class="sub" id="hdrSub">Low food day · Fill sets · Export to Health Bot</div>
   <div class="progress"><i id="prog"></i></div>
 </header>
 <main id="app">
-  <!-- Visible on first paint before JS runs -->
-  <ul class="static-list" id="bootList">
-    <li>Back squat <span>60 / 70 / 70 × 8 (filled)</span></li>
-    <li>Leg press <span>fill me</span></li>
-    <li>Lying leg curl <span>32 × 12 × 3 (filled)</span></li>
-    <li>Seated leg curl <span>fill me</span></li>
-    <li>Seated calf raise <span>25 × 12 × 3 (filled)</span></li>
-    <li>Standing calf <span>fill me</span></li>
+  <!-- First-paint bootList: keep in sync with DEFAULTS sample names so page is never blank before JS -->
+  <!-- REPLACE_DEFAULTS: replace this list when you replace DEFAULTS -->
+    <ul class="static-list" id="bootList">
+    <li>Lat pulldown <span>3 x 6-8</span></li>
+    <li>Incline DB press <span>3 x 8-10</span></li>
+    <li>Single-arm DB row <span>3 x 8-10 /arm</span></li>
+    <li>Cable / machine fly <span>2 x 12-15</span></li>
+    <li>EZ-bar or DB curl <span>2 x 10-12</span></li>
+    <li>Overhead triceps extension <span>2 x 12-15</span></li>
   </ul>
 </main>
 <div class="foot">
@@ -76,36 +78,41 @@ button.remove{color:var(--danger);border-color:rgba(248,113,113,.35);padding:8px
 <div class="toast" id="toast"></div>
 <script>
 (function(){
+/* ===== REPLACEABLE SESSION BLOCK ===== */
+var SESSION = {
+  title: "Upper B — Short · Tonight",
+  subtitle: "Low food day · Fill sets · Export to Health Bot",
+  exportName: "UPPER_B_EXPORT",
+  sessionLabel: "Upper B Short",
+  storageKey: "workout_upperB_short_2026-09-23",
+  date: "2026-09-23"
+};
 var DEFAULTS = [
-  {id:"back_squat",name:"Back squat",target:"3 x 6-8",sets:3,rep_lo:6,rep_hi:8,tip:"Already logged — edit if wrong.",preset:[{weight:"60",reps:"8",done:true},{weight:"70",reps:"8",done:true},{weight:"70",reps:"8",done:true}]},
-  {id:"leg_press",name:"Leg press",target:"fill sets",sets:3,rep_lo:6,rep_hi:12,tip:"Fill weight and reps for what you did."},
-  {id:"lying_curl",name:"Lying leg curl",target:"3 x 10-12",sets:3,rep_lo:10,rep_hi:12,tip:"Already logged — edit if wrong.",preset:[{weight:"32",reps:"12",done:true},{weight:"32",reps:"12",done:true},{weight:"32",reps:"12",done:true}]},
-  {id:"seated_curl",name:"Seated leg curl",target:"fill sets",sets:3,rep_lo:10,rep_hi:12,tip:"Fill weight and reps for what you did."},
-  {id:"seated_calf",name:"Seated calf raise",target:"3 x 10-15",sets:3,rep_lo:10,rep_hi:15,tip:"Already logged — edit if wrong.",preset:[{weight:"25",reps:"12",done:true},{weight:"25",reps:"12",done:true},{weight:"25",reps:"12",done:true}]},
-  {id:"standing_calf",name:"Standing calf",target:"fill sets",sets:3,rep_lo:10,rep_hi:15,tip:"Fill weight and reps for what you did."}
+  {id:"lat_pulldown",name:"Lat pulldown",target:"3 x 6-8",sets:3,rep_lo:6,rep_hi:8,tip:"Start 50 kg from 9/20. Hard but clean.",startWeight:"50"},
+  {id:"incline_db",name:"Incline DB press",target:"3 x 8-10",sets:3,rep_lo:8,rep_hi:10,tip:"Start ~20 kg/hand. Bump if old high-rep DBs were easy.",startWeight:"20"},
+  {id:"sa_db_row",name:"Single-arm DB row",target:"3 x 8-10 /arm",sets:3,rep_lo:8,rep_hi:10,tip:"Start ~20 kg. Brace hard each rep.",startWeight:"20"},
+  {id:"cable_fly",name:"Cable / machine fly",target:"2 x 12-15",sets:2,rep_lo:12,rep_hi:15,tip:"Squeeze at stretch. Soft elbows.",startWeight:""},
+  {id:"curl",name:"EZ-bar or DB curl",target:"2 x 10-12",sets:2,rep_lo:10,rep_hi:12,tip:"No swing. Leave 1–2 in the tank.",startWeight:""},
+  {id:"oh_tri",name:"Overhead triceps extension",target:"2 x 12-15",sets:2,rep_lo:12,rep_hi:15,tip:"Elbows tight. Soft lockout.",startWeight:""}
 ];
-var KEY = "lowerA_tonight_v1_2026-09-22";
+/* ===== END SESSION BLOCK ===== */
 
-function makeSets(n){
-  var sets=[], i;
-  for(i=0;i<n;i++) sets.push({weight:"",reps:"",done:false});
+var KEY = SESSION.storageKey;
+
+function makeSets(n, startWeight){
+  var sets=[], i, w;
+  w = (typeof startWeight === "string" && startWeight) ? startWeight : "";
+  for(i=0;i<n;i++) sets.push({weight:w,reps:"",done:false});
   return sets;
 }
 
 function emptyState(){
-  var s={date:"2026-09-22",order:[],exercises:{}};
-  var i, d, sets, j, allDone;
+  var s={date:SESSION.date,order:[],exercises:{}};
+  var i, d, sets, j;
   for(i=0;i<DEFAULTS.length;i++){
     d=DEFAULTS[i];
     s.order.push(d.id);
-    if(d.preset&&d.preset.length){
-      sets=[];
-      for(j=0;j<d.preset.length;j++) sets.push({weight:d.preset[j].weight,reps:d.preset[j].reps,done:!!d.preset[j].done});
-    } else {
-      sets=makeSets(d.sets);
-    }
-    allDone=true;
-    for(j=0;j<sets.length;j++) if(!sets[j].done){allDone=false;break;}
+    sets=makeSets(d.sets, d.startWeight);
     s.exercises[d.id]={
       name:d.name,
       target:d.target,
@@ -113,7 +120,7 @@ function emptyState(){
       rep_lo:d.rep_lo||8,
       rep_hi:d.rep_hi||12,
       setCount:sets.length,
-      done:allDone,
+      done:false,
       sets:sets,
       custom:false
     };
@@ -127,7 +134,7 @@ function load(){
     if(!r) return emptyState();
     var s=JSON.parse(r);
     if(!s.order||!s.exercises) return emptyState();
-    if(!s.date) s.date=new Date().toISOString().slice(0,10);
+    if(!s.date) s.date=SESSION.date;
     var i, id, ex, need;
     for(i=0;i<DEFAULTS.length;i++){
       id=DEFAULTS[i].id;
@@ -136,7 +143,7 @@ function load(){
         s.exercises[id]={
           name:need.name,target:need.target,tip:need.tip||"",
           rep_lo:need.rep_lo,rep_hi:need.rep_hi,setCount:need.sets,
-          done:false,sets:makeSets(need.sets),custom:false
+          done:false,sets:makeSets(need.sets, need.startWeight),custom:false
         };
         if(s.order.indexOf(id)<0) s.order.push(id);
       }
@@ -146,7 +153,7 @@ function load(){
       ex=s.exercises[id];
       if(!ex) continue;
       if(!ex.sets||!ex.sets.length){
-        ex.sets=makeSets(ex.setCount||3);
+        ex.sets=makeSets(ex.setCount||3, "");
       }
       if(typeof ex.name!=="string") ex.name="Exercise";
     }
@@ -182,7 +189,7 @@ function updateProgress(){
 }
 
 function buildExportText(){
-  var lines=["LOWER_A_EXPORT","date: "+state.date,"session: Lower A (actual 2026-09-22)","---"];
+  var lines=[SESSION.exportName,"date: "+state.date,"session: "+SESSION.sessionLabel,"---"];
   var i,id,ex,j,s;
   for(i=0;i<state.order.length;i++){
     id=state.order[i];
@@ -204,10 +211,54 @@ function uid(){
   return "custom_"+Date.now()+"_"+Math.floor(Math.random()*10000);
 }
 
+function bumpSet1(ex, delta){
+  if(!ex.sets||!ex.sets.length) return;
+  var cur=parseFloat(ex.sets[0].weight);
+  if(isNaN(cur)) cur=0;
+  ex.sets[0].weight=String(Math.round((cur+delta)*10)/10);
+  save();
+  render();
+}
+
+function copySet1ToRest(ex){
+  if(!ex.sets||ex.sets.length<2){toast("Need 2+ sets");return;}
+  var w=ex.sets[0].weight;
+  var r=ex.sets[0].reps;
+  var z;
+  for(z=1;z<ex.sets.length;z++){
+    ex.sets[z].weight=w;
+    ex.sets[z].reps=r;
+    /* leave done unchecked unless already set */
+  }
+  save();
+  render();
+  toast("Copied set 1 → rest");
+}
+
+function addSet(ex){
+  ex.sets.push({weight:"",reps:"",done:false});
+  ex.setCount=ex.sets.length;
+  if(ex.target && /^\d+\s*sets?$/i.test(ex.target)){
+    ex.target=ex.sets.length+" sets";
+  }
+  ex.done=false;
+  save();
+  render();
+  toast("Set added");
+}
+
+function applyHeader(){
+  var t=document.getElementById("hdrTitle");
+  var s=document.getElementById("hdrSub");
+  if(t) t.textContent=SESSION.title;
+  if(s) s.textContent=SESSION.subtitle;
+  try{document.title=SESSION.title;}catch(e){}
+}
+
 function render(){
   var app=document.getElementById("app");
   app.innerHTML="";
-  var i,id,ex,art,head,cb,titleWrap,nameInp,targetEl,tipEl,labels,idx,div,row,inputs,actions,btnRm,addBox;
+  var i,id,ex,art,head,cb,titleWrap,nameInp,targetEl,tipEl,labels,idx,div,row,inputs,actions,btnRm,btnCopy,btnBump25,btnBump5,btnAddSet,addBox;
 
   for(i=0;i<state.order.length;i++){
     id=state.order[i];
@@ -266,13 +317,50 @@ function render(){
     head.appendChild(titleWrap);
     art.appendChild(head);
 
+    actions=document.createElement("div");
+    actions.className="ex-actions";
+
+    btnCopy=document.createElement("button");
+    btnCopy.type="button";
+    btnCopy.textContent="Copy set 1 \u2192 rest";
+    btnCopy.onclick=(function(exRef){
+      return function(){copySet1ToRest(exRef);};
+    })(ex);
+    actions.appendChild(btnCopy);
+
+    btnBump25=document.createElement("button");
+    btnBump25.type="button";
+    btnBump25.className="bump";
+    btnBump25.textContent="+2.5";
+    btnBump25.title="Add 2.5 kg to set 1 weight";
+    btnBump25.onclick=(function(exRef){
+      return function(){bumpSet1(exRef,2.5);};
+    })(ex);
+    actions.appendChild(btnBump25);
+
+    btnBump5=document.createElement("button");
+    btnBump5.type="button";
+    btnBump5.className="bump";
+    btnBump5.textContent="+5";
+    btnBump5.title="Add 5 kg to set 1 weight";
+    btnBump5.onclick=(function(exRef){
+      return function(){bumpSet1(exRef,5);};
+    })(ex);
+    actions.appendChild(btnBump5);
+
+    btnAddSet=document.createElement("button");
+    btnAddSet.type="button";
+    btnAddSet.textContent="Add set";
+    btnAddSet.onclick=(function(exRef){
+      return function(){addSet(exRef);};
+    })(ex);
+    actions.appendChild(btnAddSet);
+
     if(ex.custom){
-      actions=document.createElement("div");
-      actions.className="ex-actions";
       btnRm=document.createElement("button");
       btnRm.type="button";
       btnRm.className="remove";
-      btnRm.textContent="Remove exercise";
+      btnRm.textContent="Remove";
       btnRm.onclick=(function(rid){
         return function(){
           if(!confirm("Remove this exercise?")) return;
@@ -288,12 +376,13 @@ function render(){
         };
       })(id);
       actions.appendChild(btnRm);
-      art.appendChild(actions);
     }
+
+    art.appendChild(actions);
 
     labels=document.createElement("div");
     labels.className="set-labels";
-    labels.innerHTML="<span>#</span><span>Weight</span><span>Reps</span><span>✓</span>";
+    labels.innerHTML="<span>#</span><span>Weight</span><span>Reps</span><span>\u2713</span>";
     art.appendChild(labels);
 
     for(idx=0;idx<ex.sets.length;idx++){
@@ -313,6 +402,7 @@ function render(){
           var all=true,z;
           for(z=0;z<exRef.sets.length;z++) if(!exRef.sets[z].done) all=false;
           if(all) exRef.done=true;
+          else exRef.done=false;
           save();
           artRef.classList.toggle("done",exRef.done);
           updateProgress();
@@ -346,7 +436,7 @@ function render(){
       rep_hi:12,
       setCount:n,
       done:false,
-      sets:makeSets(n),
+      sets:makeSets(n, ""),
       custom:true
     };
     state.order.push(nid);
@@ -360,18 +450,19 @@ function render(){
 
 function exportToBot(){
   var text=buildExportText();
+  var fname=SESSION.exportName+"_"+state.date+".txt";
   if(navigator.share){
-    navigator.share({title:"Lower A export",text:text}).then(function(){
+    navigator.share({title:SESSION.sessionLabel+" export",text:text}).then(function(){
       toast("Shared — choose Health Bot");
     }).catch(function(){
-      fallbackCopy(text);
+      fallbackCopy(text, fname);
     });
     return;
   }
-  fallbackCopy(text);
+  fallbackCopy(text, fname);
 }
 
-function fallbackCopy(text){
+function fallbackCopy(text, fname){
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(function(){
       toast("Copied — paste in Health Bot");
@@ -384,7 +475,7 @@ function fallbackCopy(text){
   try{
     var a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));
-    a.download="LowerA_"+state.date+".txt";
+    a.download=fname||("workout_"+state.date+".txt");
     a.click();
   }catch(e){}
 }
@@ -400,9 +491,10 @@ document.getElementById("btnReset").onclick=function(){
 };
 
 try{
+  applyHeader();
   render();
 }catch(err){
-  document.getElementById("app").innerHTML="<p class=\"noscript\">Logger failed to load: "+String(err)+"</p><ul class=\"static-list\"><li>Back squat or leg press</li><li>Romanian deadlift</li><li>Lunges or Bulgarian</li><li>Leg curl</li><li>Calf raise</li><li>Abs</li></ul>";
+  document.getElementById("app").innerHTML="<p class=\"noscript\">Logger failed to load: "+String(err)+"</p><ul class=\"static-list\"><li>Demo A</li><li>Demo B</li><li>Demo C</li></ul>";
 }
 })();
 </script>
